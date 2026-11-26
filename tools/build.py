@@ -135,7 +135,7 @@ POST = r'''<style id="pwa-css">
 </script>
 '''
 k = s.rfind('</body></html>')
-s = s[:k] + POST + s[k:]
+s = s[:k] + POST + '<script src="config.js"></script>\n<script src="sync.js"></script>\n' + s[k:]
 if 'id="pwa-post"' not in s:
     raise SystemExit('post script not inserted')
 
