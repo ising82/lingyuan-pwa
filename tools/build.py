@@ -70,14 +70,41 @@ POST = r'''<style id="pwa-css">
     var d=JSON.parse(txt); if(!d || !Array.isArray(d.logs)) throw new Error("格式不對");
     return d;
   }
+  function mergeData(L,I){
+    /* 合併：這台裝置的紀錄（L）保留，檔案（I，通常是原 App 的最新資料）帶進新的待辦、看診、報告等 */
+    function byKey(a,b,key,preferB){
+      var m={}, order=[];
+      (a||[]).forEach(function(x){ if(x && x[key]!=null && !(x[key] in m)){ m[x[key]]=x; order.push(x[key]); } });
+      (b||[]).forEach(function(x){ if(!x || x[key]==null) return; if(!(x[key] in m)){ order.push(x[key]); m[x[key]]=x; } else if(preferB){ m[x[key]]=x; } });
+      return order.map(function(k){ return m[k]; });
+    }
+    function orTrue(a,b){ var o={}, k; a=a||{}; b=b||{}; for(k in a) o[k]=a[k]; for(k in b) o[k]=b[k]||a[k]; return o; }
+    var o={}, k; for(k in L) o[k]=L[k];
+    o.logs=byKey(L.logs,I.logs,"id",false).sort(function(x,y){ return x.t<y.t?-1:x.t>y.t?1:0; });
+    ["items","visits","qs","reports"].forEach(function(f){ if(I[f]||L[f]) o[f]=byKey(L[f],I[f],"id",true); });
+    o.growth=byKey(L.growth,I.growth,"d",false).sort(function(x,y){ return x.d<y.d?-1:x.d>y.d?1:0; });
+    o.days=byKey(L.days,I.days,"d",false).sort(function(x,y){ return x.d<y.d?-1:x.d>y.d?1:0; });
+    o.checks=orTrue(L.checks,I.checks); o.miles=orTrue(L.miles,I.miles);
+    var seen={}; o.feed=(I.feed||[]).concat(L.feed||[]).filter(function(x){ var key=x&&(x.at+"|"+x.text); if(!x||seen[key]) return false; seen[key]=1; return true; }).sort(function(x,y){ return x.at<y.at?1:x.at>y.at?-1:0; });
+    ["drive","links","medInfo","idno","contacts"].forEach(function(f){ if(I[f]!=null && I[f]!=="") o[f]=I[f]; });
+    o.updated=(L.updated||"")>(I.updated||"")?L.updated:I.updated;
+    return o;
+  }
   function doImport(file){
     var r=new FileReader();
     r.onload=function(){
       try{
-        var d=parseImport(r.result), n=d.logs.length;
-        if(window.LY_PWA.hasData() && !confirm("要用檔案裡的資料（"+n+" 筆紀錄）取代這台裝置目前的資料嗎？")) return;
+        var d=parseImport(r.result), n=d.logs.length, msg;
+        if(window.LY_PWA.hasData()){
+          if(confirm("合併：保留這台裝置的紀錄，加入檔案裡新的待辦、看診和其他更新？\n（按「取消」可改成整個取代）")){
+            var cur=null; try{ cur=JSON.parse(localStorage.getItem(KEY)); }catch(e){}
+            if(!cur && typeof DATA==="object") cur=DATA;
+            if(cur && Array.isArray(cur.logs)){ var before=cur.logs.length; d=mergeData(cur,d); msg="已合併：紀錄 "+before+" → "+d.logs.length+" 筆，待辦與看診已更新"; }
+          }
+          if(!msg && !confirm("要用檔案裡的資料（"+n+" 筆紀錄）整個取代這台裝置目前的資料嗎？這台裝置上新記的紀錄會不見。")) return;
+        }
         localStorage.setItem(KEY, JSON.stringify(d)); try{ sessionStorage.removeItem("ly-pending"); }catch(e){}
-        alert("已匯入 "+n+" 筆紀錄"); location.reload();
+        alert(msg || ("已匯入 "+n+" 筆紀錄")); location.reload();
       }catch(e){ alert("匯入失敗："+e.message); }
     };
     r.readAsText(file);
