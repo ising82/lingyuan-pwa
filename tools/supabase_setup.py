@@ -1,5 +1,6 @@
 """產生要貼進 Supabase SQL Editor 的設定。
-usage: python3 -I supabase_setup.py <data.json> <family_code> > setup.sql
+usage: python3 -I supabase_setup.py <data.json|-> <family_code> > setup.sql
+  data 給 "-" 表示不帶起始資料：雲端先空著，第一支有紀錄的手機連上時會自動上傳當起點。
 - 建 ly_cfg / ly_snap / ly_ops 三張表，全部開 RLS 且不給任何 policy（anon 不能直接讀寫）。
 - 只開放四個 security definer 函式，每個都要帶家庭代碼 p_k。
 - 用 data.json 當雲端起始資料（ly_snap）。重跑會「重設」雲端資料並清掉舊 op。
@@ -7,10 +8,10 @@ usage: python3 -I supabase_setup.py <data.json> <family_code> > setup.sql
 """
 import sys, json
 
-data = json.load(open(sys.argv[1], encoding='utf8'))
+data = None if sys.argv[1] == '-' else json.load(open(sys.argv[1], encoding='utf8'))
 code = sys.argv[2]
 assert len(code) >= 20 and code.replace('-', '').replace('_', '').isalnum()
-body = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
+body = json.dumps(data, ensure_ascii=False, separators=(',', ':')) if data is not None else ''
 tag = '$lydata$'
 assert tag not in body
 
@@ -73,11 +74,16 @@ revoke all on function public.ly_check(text) from public, anon, authenticated;
 revoke all on function public.ly_pull(text, bigint), public.ly_push(text, jsonb, text), public.ly_init(text, jsonb) from public;
 grant execute on function public.ly_pull(text, bigint), public.ly_push(text, jsonb, text), public.ly_init(text, jsonb) to anon, authenticated;
 
--- 家庭代碼與起始資料（重跑會重設雲端資料）
+-- 家庭代碼（重跑會換代碼）
 insert into public.ly_cfg (id, k) values (1, '{code}') on conflict (id) do update set k = excluded.k;
+""")
+if data is not None:
+    print(f"""-- 起始資料（重跑會重設雲端資料）
 delete from public.ly_ops;
 insert into public.ly_snap (id, data, seq) values (1, {tag}{body}{tag}::jsonb, nextval(pg_get_serial_sequence('public.ly_ops', 'seq')))
   on conflict (id) do update set data = excluded.data, seq = excluded.seq, at = now();
 
 select 'OK：雲端已設定，紀錄 ' || jsonb_array_length(data->'logs') || ' 筆' as 結果 from public.ly_snap;
 """)
+else:
+    print("select 'OK：雲端已設定（尚無資料，等第一支手機上傳）' as 結果;")

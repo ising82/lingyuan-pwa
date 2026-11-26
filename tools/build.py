@@ -153,7 +153,8 @@ manifest = {
     {"src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}
 json.dump(manifest, open(os.path.join(out, 'manifest.webmanifest'), 'w', encoding='utf8'), ensure_ascii=False, indent=1)
 
-ver = hashlib.sha1(s.encode()).hexdigest()[:10]
+extra = b''.join(open(os.path.join(out, f), 'rb').read() for f in ('config.js', 'sync.js') if os.path.exists(os.path.join(out, f)))
+ver = hashlib.sha1(s.encode() + extra).hexdigest()[:10]  # config.js、sync.js 改了也會換快取版本
 sw = open(os.path.join(here, 'sw.template.js'), encoding='utf8').read().replace('__VER__', ver)
 open(os.path.join(out, 'sw.js'), 'w', encoding='utf8').write(sw)
 open(os.path.join(out, '.nojekyll'), 'w').write('')

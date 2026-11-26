@@ -22,7 +22,7 @@
   var box = document.getElementById("pwaBox");
   var head = box && box.querySelector("div");
   function hideImport(){
-    var f = document.getElementById("pwaFirst"); if(f) f.remove();
+    var f = document.getElementById("pwaFirst"); if(f) f.hidden = true;   // 先藏起來；雲端也沒資料時再叫回來
     var imp = box && box.querySelector("input[type=file]"); if(imp && imp.parentNode) imp.parentNode.hidden = true;
   }
   hideImport();
@@ -106,7 +106,11 @@
       if(r.empty){
         /* 雲端還沒有資料：用這台裝置的資料當起點 */
         if(DATA && Array.isArray(DATA.logs) && DATA.logs.length) return rpc("ly_init", { p_data: DATA }).then(function(){ seq = -1; return pull(); });
-        setStatus("<b>雲端還沒有資料</b>：請先在一台有紀錄的手機打開。"); return;
+        /* 這台也沒有資料：把「匯入資料」叫回來，匯入後重新載入就會自動上傳當雲端起點 */
+        var imp = box && box.querySelector("input[type=file]"); if(imp && imp.parentNode) imp.parentNode.hidden = false;
+        var first = document.getElementById("pwaFirst");
+        if(first){ first.hidden = false; first.querySelector("div").innerHTML = "<b>雲端還沒有資料</b>：用「匯入資料」選最新的資料檔（.json）或原本 App 存下來的 .html，匯入後會自動放上雲端，全家都看得到。"; }
+        setStatus("<b>雲端還沒有資料</b>：在一台有紀錄的手機打開，或在這裡按下方「匯入資料」選最新的資料檔，匯入後會自動放上雲端給全家。"); return;
       }
       if(r.snap){
         /* 第一次連線（或雲端重整過）：換成雲端資料，再補上這台還沒傳的變更，重新載入 */
