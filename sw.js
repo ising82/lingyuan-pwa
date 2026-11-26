@@ -1,5 +1,5 @@
 /* 淩淵 PWA service worker: app shell cache-first with background refresh; fonts cached on first use. */
-const CACHE = "ly-pwa-ecb5c51856";
+const CACHE = "ly-pwa-4a7b83c0f7";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png", "icons/apple-touch-icon.png", "config.js", "sync.js"];
 
 self.addEventListener("install", e => {
